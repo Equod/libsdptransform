@@ -1,0 +1,5 @@
+if (SDPTRANSFORM_USE_EXTERNAL_JSON)
+    find_package(nlohmann_json REQUIRED)
+elseif (NOT TARGET nlohmann_json)
+    add_subdirectory(json)
+endif ()

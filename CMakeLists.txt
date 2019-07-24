@@ -1,17 +1,12 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(sdptransform VERSION 1.2.4)
+project(sdptransform VERSION 1.2.4 LANGUAGES CXX)
 
-# For CMake >= 3.1.
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-# For CMake < 3.1.
-add_compile_options(-std=c++11)
+add_subdirectory(test)
+add_subdirectory(readme-helper)
+add_subdirectory(third_party)
 
-subdirs(test readme-helper)
-
-include_directories(${sdptransform_SOURCE_DIR}/include)
+option(SDPTRANSFORM_USE_EXTERNAL_JSON "Use an external JSON library" OFF)
 
 set(
 	SOURCE_FILES
@@ -23,10 +18,13 @@ set(
 set(
 	HEADER_FILES
 	include/sdptransform.hpp
-	include/json.hpp
 )
 
 add_library(sdptransform STATIC ${SOURCE_FILES} ${HEADER_FILES})
+target_compile_features(sdptransform PUBLIC cxx_std_11)
+target_include_directories(sdptransform PRIVATE include)
+
+target_link_libraries(sdptransform PUBLIC nlohmann_json::nlohmann_json)
 
 install(TARGETS sdptransform DESTINATION lib)
 install(FILES ${HEADER_FILES} DESTINATION include/sdptransform)
