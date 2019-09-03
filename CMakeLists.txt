@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(sdptransform VERSION 1.2.4 LANGUAGES CXX)
+project(sdptransform VERSION 1.2.5)
 
 add_subdirectory(test)
 add_subdirectory(readme-helper)
