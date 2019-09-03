@@ -30,66 +30,69 @@ namespace sdptransform
 
 	void insertParam(json& o, const std::string& str);
 
-	json parse(const std::string& sdp)
-	{
-		static const std::regex ValidLineRegex("^([a-z])=(.*)");
+    json parse(std::istream& sdpstream) {
+      static const std::regex ValidLineRegex("^([a-z])=(.*)");
 
-		json session = json::object();
-		std::stringstream sdpstream(sdp);
-		std::string line;
-		json media = json::array();
-		json* location = std::addressof(session);
+      json session = json::object();
+      std::string line;
+      json media = json::array();
+      json* location = std::addressof(session);
 
-		while (std::getline(sdpstream, line, '\n'))
-		{
-			// Remove \r if lines are separated with \r\n (as mandated in SDP).
-			if (line.size() && line[line.length() - 1] == '\r')
-				line.pop_back();
+      while (std::getline(sdpstream, line, '\n'))
+      {
+        // Remove \r if lines are separated with \r\n (as mandated in SDP).
+        if (line.size() && line[line.length() - 1] == '\r')
+          line.pop_back();
 
-			// Ensure it's a valid SDP line.
-			if (!std::regex_search(line, ValidLineRegex))
-				continue;
+        // Ensure it's a valid SDP line.
+        if (!std::regex_search(line, ValidLineRegex))
+          continue;
 
-			char type = line[0];
-			std::string content = line.substr(2);
+        char type = line[0];
+        std::string content = line.substr(2);
 
-			if (type == 'm')
-			{
-				json m = json::object();
+        if (type == 'm')
+        {
+          json m = json::object();
 
-				m["rtp"] = json::array();
-				m["fmtp"] = json::array();
+          m["rtp"] = json::array();
+          m["fmtp"] = json::array();
 
-				media.push_back(m);
+          media.push_back(m);
 
-				// Point at latest media line.
-				location = std::addressof(media[media.size() - 1]);
-			}
+          // Point at latest media line.
+          location = std::addressof(media[media.size() - 1]);
+        }
 
-			auto it = grammar::rulesMap.find(type);
+        auto it = grammar::rulesMap.find(type);
 
-			if (it == grammar::rulesMap.end())
-				continue;
+        if (it == grammar::rulesMap.end())
+          continue;
 
-			auto& rules = it->second;
+        auto& rules = it->second;
 
-			for (size_t j = 0; j < rules.size(); ++j)
-			{
-				auto& rule = rules[j];
+        for (size_t j = 0; j < rules.size(); ++j)
+        {
+          auto& rule = rules[j];
 
-				if (std::regex_search(content, rule.reg))
-				{
-					parseReg(rule, *location, content);
+          if (std::regex_search(content, rule.reg))
+          {
+            parseReg(rule, *location, content);
 
-					break;
-				}
-			}
-		}
+            break;
+          }
+        }
+      }
 
-		// Link it up.
-		session["media"] = media;
+      // Link it up.
+      session["media"] = media;
 
-		return session;
+      return session;
+    }
+
+	json parse(const std::string& sdp) {
+      std::istringstream iss_sdp(sdp);
+      return parse(iss_sdp);
 	}
 
 	json parseParams(const std::string& str)
