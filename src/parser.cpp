@@ -30,7 +30,8 @@ namespace sdptransform
 
 	void insertParam(json& o, const std::string& str);
 
-    json parse(std::istream& sdpstream) {
+    json parse(std::istream& sdpstream)
+    {
       static const std::regex ValidLineRegex("^([a-z])=(.*)");
 
       json session = json::object();
@@ -90,7 +91,8 @@ namespace sdptransform
       return session;
     }
 
-	json parse(const std::string& sdp) {
+	json parse(const std::string& sdp)
+	{
       std::istringstream iss_sdp(sdp);
       return parse(iss_sdp);
 	}
