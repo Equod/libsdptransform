@@ -1,32 +1,30 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.13)
 
 project(sdptransform VERSION 1.2.6)
 
-# For CMake >= 3.1.
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-# For CMake < 3.1.
-add_compile_options(-std=c++11)
+add_subdirectory(test)
+add_subdirectory(readme-helper)
 
-subdirs(test readme-helper)
+add_library(${PROJECT_NAME}
+        src/grammar.cpp
+        src/parser.cpp
+        src/writer.cpp
+        include/sdptransform/sdptransform.hpp)
 
-include_directories(${sdptransform_SOURCE_DIR}/include)
+set_target_properties(${PROJECT_NAME}
+        PROPERTIES CXX_STANDARD 17
+        )
 
-set(
-	SOURCE_FILES
-	src/grammar.cpp
-	src/parser.cpp
-	src/writer.cpp
+target_include_directories(${PROJECT_NAME}
+        PUBLIC
+            include
+        PRIVATE
+            include/sdptransform)
+
+target_link_libraries(${PROJECT_NAME}
+        PUBLIC
+            nlohmann_json::nlohmann_json
 )
 
-set(
-	HEADER_FILES
-	include/sdptransform.hpp
-	include/json.hpp
-)
-
-add_library(sdptransform STATIC ${SOURCE_FILES} ${HEADER_FILES})
-
-install(TARGETS sdptransform DESTINATION lib)
-install(FILES ${HEADER_FILES} DESTINATION include/sdptransform)
+#install(TARGETS sdptransform DESTINATION lib)
+#install(FILES include/sdptransform/sdptransform.hpp DESTINATION include/sdptransform)
