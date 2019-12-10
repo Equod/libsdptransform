@@ -28,6 +28,8 @@ namespace sdptransform
 		extern const std::map<char, std::vector<Rule>> rulesMap;
 	}
 
+    json parse(std::istream& input_stream);
+
 	json parse(const std::string& sdp);
 
 	json parseParams(const std::string& str);
