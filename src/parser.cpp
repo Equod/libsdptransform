@@ -7,376 +7,331 @@
 #include <algorithm> // std::find_if()
 #include <cctype>    // std::isspace()
 
-namespace sdptransform
-{
-	void parseReg(const grammar::Rule& rule, json& location, const std::string& content);
+namespace sdptransform {
+void parseReg(const grammar::Rule& rule, json& location, const std::string& content);
 
-	void attachProperties(
-		const std::smatch& match,
-		json& location,
-		const std::vector<std::string>& names,
-		const std::string& rawName,
-		const std::vector<char>& types
-	);
+void attachProperties(
+    const std::smatch& match,
+    json& location,
+    const std::vector<std::string>& names,
+    const std::string& rawName,
+    const std::vector<char>& types
+);
 
-	json toType(const std::string& str, char type);
+json toType(const std::string& str, char type);
 
-	bool isNumber(const std::string& str);
+bool isNumber(const std::string& str);
 
-	bool isInt(const std::string& str);
+bool isInt(const std::string& str);
 
-	bool isFloat(const std::string& str);
+bool isFloat(const std::string& str);
 
-	void trim(std::string& str);
+void trim(std::string& str);
 
-	void insertParam(json& o, const std::string& str);
+void insertParam(json& o, const std::string& str);
 
-    json parse(std::istream& input_stream)
-    {
-      static const std::regex ValidLineRegex("^([a-z])=(.*)");
-      json session = json::object();
-      std::string line;
-      json media = json::array();
-      json* location = std::addressof(session);
+json parse(std::istream& input_stream) {
+  static const std::regex ValidLineRegex("^([a-z])=(.*)");
+  json session = json::object();
+  std::string line;
+  json media = json::array();
+  json* location = std::addressof(session);
 
-      while (std::getline(input_stream, line, '\n'))
-      {
-        // Remove \r if lines are separated with \r\n (as mandated in SDP).
-        if (!line.empty() && line[line.length() - 1] == '\r')
-          line.pop_back();
+  while (std::getline(input_stream, line, '\n')) {
+    // Remove \r if lines are separated with \r\n (as mandated in SDP).
+    if (!line.empty() && line[line.length() - 1] == '\r')
+      line.pop_back();
 
-        // Ensure it's a valid SDP line.
-        if (!std::regex_search(line, ValidLineRegex))
-          continue;
+    // Ensure it's a valid SDP line.
+    if (!std::regex_search(line, ValidLineRegex))
+      continue;
 
-        char type = line[0];
-        std::string content = line.substr(2);
+    char type = line[0];
+    std::string content = line.substr(2);
 
-        if (type == 'm')
-        {
-          json m = json::object();
+    if (type == 'm') {
+      json m = json::object();
 
-          m["rtp"] = json::array();
-          m["fmtp"] = json::array();
+      m["rtp"] = json::array();
+      m["fmtp"] = json::array();
 
-          media.push_back(m);
+      media.push_back(m);
 
-          // Point at latest media line.
-          location = std::addressof(media[media.size() - 1]);
-        }
-
-        auto it = grammar::rulesMap.find(type);
-
-        if (it == grammar::rulesMap.end())
-          continue;
-
-        auto& rules = it->second;
-
-        for (const auto & rule : rules)
-        {
-          if (std::regex_search(content, rule.reg))
-          {
-            parseReg(rule, *location, content);
-
-            break;
-          }
-        }
-      }
-
-      // Link it up.
-      session["media"] = media;
-
-      return session;
+      // Point at latest media line.
+      location = std::addressof(media[media.size() - 1]);
     }
 
-	json parse(const std::string& sdp)
-	{
-		std::stringstream sdp_stream(sdp);
-		return parse(sdp_stream);
-	}
+    auto it = grammar::rulesMap.find(type);
 
-	json parseParams(const std::string& str)
-	{
-		json obj = json::object();
-		std::stringstream ss(str);
-		std::string param;
+    if (it == grammar::rulesMap.end())
+      continue;
 
-		while (std::getline(ss, param, ';'))
-		{
-			trim(param);
+    auto& rules = it->second;
 
-			if (param.length() == 0)
-				continue;
+    for (const auto& rule : rules) {
+      if (std::regex_search(content, rule.reg)) {
+        parseReg(rule, *location, content);
 
-			insertParam(obj, param);
-		}
+        break;
+      }
+    }
+  }
 
-		return obj;
-	}
+  // Link it up.
+  session["media"] = media;
 
-	std::vector<int> parsePayloads(const std::string& str)
-	{
-		std::vector<int> arr;
+  return session;
+}
 
-		std::stringstream ss(str);
-		std::string payload;
+json parse(const std::string& sdp) {
+  std::stringstream sdp_stream(sdp);
+  return parse(sdp_stream);
+}
 
-		while (std::getline(ss, payload, ' '))
-		{
-			arr.push_back(std::stoi(payload));
-		}
+json parseParams(const std::string& str) {
+  json obj = json::object();
+  std::stringstream ss(str);
+  std::string param;
 
-		return arr;
-	}
+  while (std::getline(ss, param, ';')) {
+    trim(param);
 
-	json parseImageAttributes(const std::string& str)
-	{
-		json arr = json::array();
-		std::stringstream ss(str);
-		std::string item;
+    if (param.length() == 0)
+      continue;
 
-		while (std::getline(ss, item, ' '))
-		{
-			trim(item);
+    insertParam(obj, param);
+  }
 
-			// Special case for * value.
-			if (item == "*")
-				return item;
+  return obj;
+}
 
-			if (item.length() < 5) // [x=0]
-				continue;
+std::vector<int> parsePayloads(const std::string& str) {
+  std::vector<int> arr;
+  std::stringstream ss(str);
+  std::copy(std::istream_iterator<int>(ss), std::istream_iterator<int>(), std::back_inserter(arr));
+  return arr;
+}
 
-			json obj = json::object();
-			std::stringstream ss2(item.substr(1, item.length() - 2));
-			std::string param;
+json parseImageAttributes(const std::string& str) {
+  json arr = json::array();
+  std::stringstream ss(str);
+  std::string item;
 
-			while (std::getline(ss2, param, ','))
-			{
-				trim(param);
+  while (std::getline(ss, item, ' ')) {
+    trim(item);
 
-				if (param.length() == 0)
-					continue;
+    // Special case for * value.
+    if (item == "*")
+      return item;
 
-				insertParam(obj, param);
-			}
+    if (item.length() < 5) // [x=0]
+      continue;
 
-			arr.push_back(obj);
-		}
+    json obj = json::object();
+    std::stringstream ss2(item.substr(1, item.length() - 2));
+    std::string param;
 
-		return arr;
-	}
+    while (std::getline(ss2, param, ',')) {
+      trim(param);
 
-	json parseSimulcastStreamList(const std::string& str)
-	{
-		json arr = json::array();
-		std::stringstream ss(str);
-		std::string item;
+      if (param.length() == 0)
+        continue;
 
-		while (std::getline(ss, item, ';'))
-		{
-			if (item.length() == 0)
-				continue;
+      insertParam(obj, param);
+    }
 
-			json arr2 = json::array();
-			std::stringstream ss2(item);
-			std::string format;
+    arr.push_back(obj);
+  }
 
-			while (std::getline(ss2, format, ','))
-			{
-				if (format.length() == 0)
-					continue;
+  return arr;
+}
 
-				json obj = json::object();
+json parseSimulcastStreamList(const std::string& str) {
+  json arr = json::array();
+  std::stringstream ss(str);
+  std::string item;
 
-				if (format[0] != '~')
-				{
-					obj["scid"] = format;
-					obj["paused"] = false;
-				}
-				else
-				{
-					obj["scid"] = format.substr(1);
-					obj["paused"] = true;
-				}
+  while (std::getline(ss, item, ';')) {
+    if (item.length() == 0)
+      continue;
 
-				arr2.push_back(obj);
-			}
+    json arr2 = json::array();
+    std::stringstream ss2(item);
+    std::string format;
 
-			arr.push_back(arr2);
-		}
+    while (std::getline(ss2, format, ',')) {
+      if (format.length() == 0)
+        continue;
 
-		return arr;
-	}
+      json obj = json::object();
 
-	void parseReg(const grammar::Rule& rule, json& location, const std::string& content)
-	{
-		bool needsBlank = !rule.name.empty() && !rule.names.empty();
+      if (format[0] != '~') {
+        obj["scid"] = format;
+        obj["paused"] = false;
+      } else {
+        obj["scid"] = format.substr(1);
+        obj["paused"] = true;
+      }
 
-		if (!rule.push.empty() && location.find(rule.push) == location.end())
-		{
-			location[rule.push] = json::array();
-		}
-		else if (needsBlank && location.find(rule.name) == location.end())
-		{
-			location[rule.name] = json::object();
-		}
+      arr2.push_back(obj);
+    }
 
-		std::smatch match;
+    arr.push_back(arr2);
+  }
 
-		std::regex_search(content, match, rule.reg);
+  return arr;
+}
 
-		json object = json::object();
-		json& keyLocation = !rule.push.empty()
-			// Blank object that will be pushed.
-			? object
-			// Otherwise named location or root.
-			: needsBlank
-				? location[rule.name]
-				: location;
+void parseReg(const grammar::Rule& rule, json& location, const std::string& content) {
+  bool needsBlank = !rule.name.empty() && !rule.names.empty();
 
-		attachProperties(match, keyLocation, rule.names, rule.name, rule.types);
+  if (!rule.push.empty() && location.find(rule.push) == location.end()) {
+    location[rule.push] = json::array();
+  } else if (needsBlank && location.find(rule.name) == location.end()) {
+    location[rule.name] = json::object();
+  }
 
-		if (!rule.push.empty())
-			location[rule.push].push_back(keyLocation);
-	}
+  std::smatch match;
 
-	void attachProperties(
-		const std::smatch& match,
-		json& location,
-		const std::vector<std::string>& names,
-		const std::string& rawName,
-		const std::vector<char>& types
-	)
-	{
-		if (!rawName.empty() && names.empty())
-		{
-			location[rawName] = toType(match[1].str(), types[0]);
-		}
-		else
-		{
-			for (size_t i = 0; i < names.size(); ++i)
-			{
-				if (i + 1 < match.size() && !match[i + 1].str().empty())
-				{
-					location[names[i]] = toType(match[i + 1].str(), types[i]);
-				}
-			}
-		}
-	}
+  std::regex_search(content, match, rule.reg);
 
-	bool isInt(const std::string& str)
-	{
-		std::istringstream iss(str);
-		long l;
+  json object = json::object();
+  json& keyLocation = !rule.push.empty()
+                      // Blank object that will be pushed.
+                      ? object
+                      // Otherwise named location or root.
+                      : needsBlank
+                        ? location[rule.name]
+                        : location;
 
-		iss >> std::noskipws >> l;
+  attachProperties(match, keyLocation, rule.names, rule.name, rule.types);
 
-		return iss.eof() && !iss.fail();
-	}
+  if (!rule.push.empty())
+    location[rule.push].push_back(keyLocation);
+}
 
-	bool isFloat(const std::string& str)
-	{
-		std::istringstream iss(str);
-		float f;
+void attachProperties(
+    const std::smatch& match,
+    json& location,
+    const std::vector<std::string>& names,
+    const std::string& rawName,
+    const std::vector<char>& types
+) {
+  if (!rawName.empty() && names.empty()) {
+    location[rawName] = toType(match[1].str(), types[0]);
+  } else {
+    for (size_t i = 0; i < names.size(); ++i) {
+      if (i + 1 < match.size() && !match[i + 1].str().empty()) {
+        location[names[i]] = toType(match[i + 1].str(), types[i]);
+      }
+    }
+  }
+}
 
-		iss >> std::noskipws >> f;
+bool isInt(const std::string& str) {
+  std::istringstream iss(str);
+  long l;
 
-		return iss.eof() && !iss.fail();
-	}
+  iss >> std::noskipws >> l;
 
-	json toType(const std::string& str, char type)
-	{
-		// https://stackoverflow.com/a/447307/4827838.
+  return iss.eof() && !iss.fail();
+}
 
-		switch (type)
-		{
-			case 's':
-			{
-				return str;
-			}
+bool isFloat(const std::string& str) {
+  std::istringstream iss(str);
+  float f;
 
-			case 'd':
-			{
-				std::istringstream iss(str);
-				long long ll;
+  iss >> std::noskipws >> f;
 
-				iss >> std::noskipws >> ll;
+  return iss.eof() && !iss.fail();
+}
 
-				if (iss.eof() && !iss.fail())
-					return std::stoll(str);
-				else
-					return 0;
-			}
+json toType(const std::string& str, char type) {
+  // https://stackoverflow.com/a/447307/4827838.
 
-			case 'f':
-			{
-				std::istringstream iss(str);
-				double d;
+  switch (type) {
+    case 's': {
+      return str;
+    }
 
-				iss >> std::noskipws >> d;
+    case 'd': {
+      std::istringstream iss(str);
+      long long ll;
 
-				if (iss.eof() && !iss.fail())
-					return std::stod(str);
-				else
-					return 0.0f;
-			}
-		}
+      iss >> std::noskipws >> ll;
 
-		return nullptr;
-	}
+      if (iss.eof() && !iss.fail())
+        return std::stoll(str);
+      else
+        return 0;
+    }
 
-	void trim(std::string& str)
-	{
-		str.erase(
-			str.begin(),
-			std::find_if(
-				str.begin(), str.end(), [](unsigned char ch) { return !std::isspace(ch); }
-			)
-		);
+    case 'f': {
+      std::istringstream iss(str);
+      double d;
 
-		str.erase(
-			std::find_if(
-				str.rbegin(), str.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
-			str.end()
-		);
-	}
+      iss >> std::noskipws >> d;
 
-	// @str parameters is a string like "profile-level-id=42e034".
-	void insertParam(json& o, const std::string& str)
-	{
-		static const std::regex KeyValueRegex("^\\s*([^= ]+)(?:\\s*=\\s*([^ ]+))?$");
-		static const std::unordered_map<std::string, char> WellKnownParameters =
-		{
-			// H264 codec parameters.
-			{ "profile-level-id",   's' },
-			{ "packetization-mode", 'd' },
-			// VP9 codec parameters.
-			{ "profile-id",         's' }
-		};
+      if (iss.eof() && !iss.fail())
+        return std::stod(str);
+      else
+        return 0.0f;
+    }
+  }
 
-		std::smatch match;
+  return nullptr;
+}
 
-		std::regex_match(str, match, KeyValueRegex);
+void trim(std::string& str) {
+  str.erase(
+      str.begin(),
+      std::find_if(
+          str.begin(), str.end(), [](unsigned char ch) { return !std::isspace(ch); }
+      )
+  );
 
-		if (match.size() == 0)
-			return;
+  str.erase(
+      std::find_if(
+          str.rbegin(), str.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+      str.end()
+  );
+}
 
-		std::string param = match[1].str();
-		std::string value = match[2].str();
+// @str parameters is a string like "profile-level-id=42e034".
+void insertParam(json& o, const std::string& str) {
+  static const std::regex KeyValueRegex("^\\s*([^= ]+)(?:\\s*=\\s*([^ ]+))?$");
+  static const std::unordered_map<std::string, char> WellKnownParameters =
+      {
+          // H264 codec parameters.
+          { "profile-level-id", 's' },
+          { "packetization-mode", 'd' },
+          // VP9 codec parameters.
+          { "profile-id", 's' }
+      };
 
-		auto it = WellKnownParameters.find(param);
-		char type;
+  std::smatch match;
 
-		if (it != WellKnownParameters.end())
-			type = it->second;
-		else if (isInt(match[2].str()))
-			type = 'd';
-		else if (isFloat(match[2].str()))
-			type = 'f';
-		else
-			type = 's';
+  std::regex_match(str, match, KeyValueRegex);
 
-		// Insert into the given JSON object.
-		o[match[1].str()] = toType(match[2].str(), type);
-	}
+  if (match.size() == 0)
+    return;
+
+  std::string param = match[1].str();
+  std::string value = match[2].str();
+
+  auto it = WellKnownParameters.find(param);
+  char type;
+
+  if (it != WellKnownParameters.end())
+    type = it->second;
+  else if (isInt(match[2].str()))
+    type = 'd';
+  else if (isFloat(match[2].str()))
+    type = 'f';
+  else
+    type = 's';
+
+  // Insert into the given JSON object.
+  o[match[1].str()] = toType(match[2].str(), type);
+}
 }
