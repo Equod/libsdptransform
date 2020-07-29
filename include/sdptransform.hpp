@@ -1,7 +1,7 @@
 #ifndef SDPTRANSFORM_HPP
 #define SDPTRANSFORM_HPP
 
-#include "json.hpp"
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 #include <map>
@@ -28,7 +28,9 @@ namespace sdptransform
 		extern const std::map<char, std::vector<Rule>> rulesMap;
 	}
 
-	json parse(const std::string& sdp);
+    json parse(std::istream& sdp);
+
+    json parse(const std::string& sdp);
 
 	json parseParams(const std::string& str);
 
